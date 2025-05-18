@@ -42,12 +42,19 @@ func main() {
 			n, err := conn.Read(buff)
 			if err != nil {
 				if err == io.EOF {
+					slog.Info("Server closed connection gracefully")
 					break
 				}
-				slog.Error("Read failed", "error", err)
-				fmt.Print(string(buff[0:n]))
+				slog.Error("Read failed", "error", err, "partial_data", string(buff[:n]))
+
 				break
 			}
+			response := string(buff[:n])
+			slog.Info("Server response",
+				"bytes", n,
+				"content", response,
+			)
+			fmt.Print(response)
 			conn.SetReadDeadline(time.Now().Add(time.Millisecond * 700))
 		}
 	}
