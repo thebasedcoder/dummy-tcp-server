@@ -28,7 +28,6 @@ func main() {
 			conn.Close()
 			continue
 		}
-		fmt.Printf("connected to %s", conn.RemoteAddr())
 		go handleConnection(conn)
 	}
 }
@@ -36,21 +35,35 @@ func main() {
 // handle client connection
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
+	remoteAddr := conn.RemoteAddr().String()
+	slog.Info("New connection", "client", remoteAddr)
 	// loop to stay connected with client
 	for {
 		cmdLine := make([]byte, (1024 * 4))
 		n, err := conn.Read(cmdLine)
 		if n == 0 || err != nil {
+			slog.Info("Connection Closed", "client", remoteAddr, "reason", "read error", "details", err)
 			return
 		}
+		//logiing raw received data
+		slog.Debug("Received data", "client", remoteAddr, "bytes", n, "content", string(cmdLine[:n]))
 		cmd, param := parseCommand(string(cmdLine[0:n]))
 		if cmd == "" {
+			slog.Warn("Invalid command format", "client", remoteAddr, "input", string(cmdLine[:n]))
 			continue
 		}
+		slog.Info("Command received",
+			"client", remoteAddr,
+			"command", cmd,
+			"parameter", param)
 		// execute command
 		switch strings.ToUpper(cmd) {
 		case "GET":
 			result := curr.Find(currencies, param)
+			slog.Info("Processing GET request",
+				"client", remoteAddr,
+				"parameter", param,
+				"results", len(result))
 			// stream result to client
 			for _, cur := range result {
 				_, err := fmt.Fprintf(
@@ -60,6 +73,9 @@ func handleConnection(conn net.Conn) {
 					cur.Number, cur.Country,
 				)
 				if err != nil {
+					slog.Warn("Write error",
+						"client", remoteAddr,
+						"error", err)
 					return
 				}
 				// reset deadline while writing,
@@ -70,7 +86,11 @@ func handleConnection(conn net.Conn) {
 			// reset read deadline for next read
 			conn.SetReadDeadline(
 				time.Now().Add(time.Second * 300))
+			slog.Info("GET request completed",
+				"client", remoteAddr,
+				"parameter", param)
 		default:
+			slog.Warn("Invalid command", "client", remoteAddr, "command", cmd)
 			conn.Write([]byte("Invalid command\n"))
 		}
 	}
