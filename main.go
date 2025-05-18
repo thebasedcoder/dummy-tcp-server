@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"net"
 	"strings"
 	"time"
@@ -12,7 +13,12 @@ import (
 var currencies = curr.Load("./data.csv")
 
 func main() {
-	ln, _ := net.Listen("tcp", ":4040")
+	ln, err := net.Listen("tcp", ":4040")
+	if err != nil {
+		fmt.Println("error starting the server", err)
+		return
+	}
+	slog.Info("Server up and running")
 	defer ln.Close()
 	// connection loop
 	for {
